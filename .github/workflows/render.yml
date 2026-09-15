@@ -1,0 +1,41 @@
+name: render profile
+
+on:
+  schedule:
+    - cron: "23 2 * * *" # daily, ~08:00 IST
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ["scripts/**", ".github/workflows/render.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: render-profile
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # STATS_TOKEN (optional): a PAT with read:user + repo so private contributions,
+      # PRs and languages are counted. Falls back to the workflow token (public data only).
+      - run: node scripts/render.mjs
+        env:
+          GH_TOKEN: ${{ secrets.STATS_TOKEN || github.token }}
+
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: re-render profile"
+          git push
